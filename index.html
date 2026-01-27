@@ -86,7 +86,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // --- BURAYI KENDİ FIREBASE BİLGİLERİNLE DOLDUR ---
+    // --- BURAYI KENDİ BİLGİLERİNLE DOLDUR ---
     const firebaseConfig = {
         apiKey: "AIzaSyAafnX1FRRmpgZeGcsU_Y0OnvcJnNYT9tc",
         authDomain: "dlfnb-fb286.firebaseapp.com",
@@ -101,30 +101,74 @@
     const currentUser = "delfin";
     
     let localStats = {}; 
-    let isActionPlaying = false; // Şu an yemek yiyor mu?
-    let animationTimeout; // Animasyon zamanlayıcısı
+    let isActionPlaying = false; 
+    let animationTimeout; 
 
     // Oyunu Başlat
     window.startGame = function() {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('game-ui').style.display = 'flex';
         
-        // Veritabanını Dinle
         const starCountRef = ref(db, 'users/' + currentUser);
         onValue(starCountRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
                 localStats = data;
+                
+                // --- İŞTE SİHİRLİ DOKUNUŞ BURADA ---
+                // Veri ilk yüklendiğinde "Offline Hesaplaması" yapıyoruz
+                calculateOfflineProgress(data.lastSaveTime);
+
                 updateUI(localStats);
                 document.getElementById('status-bar').innerText = "🟢 Canlı Bağlantı";
             } else {
-                // İlk kez açılıyorsa veriyi oluştur
                 resetData();
             }
         });
 
-        // Offline hesaplama ve döngü (Sadece tarayıcı açıkken tetikleyici olur)
-        setInterval(gameLoop, 2000);
+        setInterval(gameLoop, 5000); // 5 saniyede bir düşsün (Tarayıcı açıkken)
+    }
+
+    // --- EKSİK OLAN FONKSİYON BU ---
+    // Site kapalıyken geçen süreyi hesaplayıp statları düşürür
+    function calculateOfflineProgress(lastTime) {
+        if (!lastTime) return;
+
+        const now = Date.now();
+        const diffSeconds = Math.floor((now - lastTime) / 1000); // Saniye farkı
+        
+        // Eğer 2 dakikadan (120 saniye) fazla kapalı kaldıysa hesapla
+        if (diffSeconds > 120) {
+            console.log("Site kapalıyken geçen süre (sn):", diffSeconds);
+
+            // FORMÜL: Her 10 dakikada (600sn) 1 puan düşsün
+            // İstediğin zorluğa göre 600 sayısını değiştirebilirsin.
+            // Sayı küçülürse oyun zorlaşır (daha çabuk acıkır).
+            const dropAmount = Math.floor(diffSeconds / 600); 
+
+            if (dropAmount > 0) {
+                // Statları düşür (Ama 0'ın altına inmesin)
+                localStats.hunger = Math.max(localStats.hunger - dropAmount, 0);
+                localStats.hygiene = Math.max(localStats.hygiene - dropAmount, 0);
+                
+                // Uyurken enerji artar, uyanıksa azalır mantığı
+                if (localStats.isSleeping) {
+                    localStats.sleep = Math.min(localStats.sleep + dropAmount, 100);
+                } else {
+                    localStats.sleep = Math.max(localStats.sleep - dropAmount, 0);
+                    localStats.fun = Math.max(localStats.fun - dropAmount, 0);
+                }
+
+                // Tarihi güncelle ki tekrar tekrar düşürmesin
+                localStats.lastSaveTime = now;
+
+                // Yeni halini Firebase'e kaydet
+                set(ref(db, 'users/' + currentUser), localStats);
+                
+                // Kullanıcıya bilgi ver (Konsolda görünür)
+                console.log(`Siz yokken ${dropAmount} puan düştü!`);
+            }
+        }
     }
 
     function resetData() {
@@ -136,112 +180,90 @@
         set(ref(db, 'users/' + currentUser), initialData);
     }
 
-    // Buton Aksiyonları (Yemek, Yıkama, Oyun)
     window.performAction = function(type, amount) {
         if (!localStats) return;
-        if (localStats.isSleeping) {
+        if (localStats.isSleeping && type !== 'sleep') {
             alert("Uyurken işlem yapamazsın! Önce uyandır.");
             return;
         }
 
-        // İstatistikleri Güncelle
         if (type === 'feed') localStats.hunger = Math.min(localStats.hunger + amount, 100);
         if (type === 'wash') localStats.hygiene = 100;
         if (type === 'play') {
             localStats.fun = Math.min(localStats.fun + amount, 100);
-            localStats.sleep = Math.max(localStats.sleep - 10, 0); // Oyun yorar
+            localStats.sleep = Math.max(localStats.sleep - 10, 0); 
         }
         
         localStats.lastSaveTime = Date.now();
         set(ref(db, 'users/' + currentUser), localStats);
-
-        // Aksiyon Animasyonunu Oynat
         playAnimation(type);
     }
 
-    // Uyku Modunu Aç/Kapat
     window.toggleSleep = function() {
         if (!localStats) return;
-        
-        // Durumu tersine çevir
         localStats.isSleeping = !localStats.isSleeping;
         localStats.lastSaveTime = Date.now();
         set(ref(db, 'users/' + currentUser), localStats);
     }
 
-    // Animasyon Yöneticisi
     function playAnimation(actionType) {
         const img = document.getElementById('char-img');
-        isActionPlaying = true; // Geçici animasyon başladı
+        isActionPlaying = true; 
         
-        // Hangi GIF oynayacak?
         let gifName = 'idle';
         if (actionType === 'feed') gifName = 'eating';
         if (actionType === 'wash') gifName = 'washing';
-        if (actionType === 'play') gifName = 'eating'; // Oyun için özel gif yoksa eating veya zıplama kullanabilirsin
+        if (actionType === 'play') gifName = 'eating'; 
 
         img.src = `./assets/${gifName}.gif`;
 
-        // Varsa eski zamanlayıcıyı iptal et
         if (animationTimeout) clearTimeout(animationTimeout);
 
-        // 3 Saniye sonra normale dön
         animationTimeout = setTimeout(() => {
             isActionPlaying = false;
-            updateCharacterState(); // Duruma uygun GIF'e geri dön
+            updateCharacterState(); 
         }, 3000);
     }
 
-    // Karakterin Sürekli Durumunu Kontrol Eden Fonksiyon
     function updateCharacterState() {
-        if (isActionPlaying) return; // Eğer şu an yemek yiyorsa araya girme
+        if (isActionPlaying) return; 
 
         const img = document.getElementById('char-img');
-        let nextGif = 'idle'; // Varsayılan
+        let nextGif = 'idle'; 
 
-        // Öncelik Sırası:
-        // 1. Uyuyor mu?
         if (localStats.isSleeping) {
             nextGif = 'sleeping';
         }
-        // 2. Çok mu uykusuz? (Uyku < 20 ve uyumuyorsa)
         else if (localStats.sleep < 20) {
             nextGif = 'sleepy';
         }
-        // 3. Çok mu aç? (Açlık < 30)
         else if (localStats.hunger < 30) {
             nextGif = 'hungry';
         }
-        // 4. Çok mu kirli? (Temizlik < 40)
         else if (localStats.hygiene < 40) {
             nextGif = 'dirty';
         }
 
-        // Eğer resim değişecekse değiştir (Sürekli yenileme yapmasın diye kontrol)
         const currentSrc = img.src;
         if (!currentSrc.includes(nextGif + '.gif')) {
             img.src = `./assets/${nextGif}.gif`;
         }
     }
 
-    // Arayüzü ve Barları Güncelle
     function updateUI(stats) {
         document.getElementById('hunger-bar').style.width = stats.hunger + '%';
         document.getElementById('hygiene-bar').style.width = stats.hygiene + '%';
         document.getElementById('sleep-bar').style.width = stats.sleep + '%';
         document.getElementById('fun-bar').style.width = stats.fun + '%';
-
-        updateCharacterState(); // GIF'i güncelle
+        updateCharacterState(); 
     }
 
-    // Oyun Döngüsü (Zamanla azalma)
     function gameLoop() {
         if (!localStats.hunger) return;
 
-        // Uyuyorsa farklı, uyanıksa farklı azalır
         if (localStats.isSleeping) {
-            localStats.sleep = Math.min(localStats.sleep + 2, 100); // Uyurken enerji dolar
-            localStats.hunger = Math.max(localStats.hunger - 0.5, 0); // Uyurken az acıkır
+            localStats.sleep = Math.min(localStats.sleep + 2, 100); 
+            localStats.hunger = Math.max(localStats.hunger - 0.5, 0); 
         } else {
             localStats.hunger = Math.max(localStats.hunger - 1, 0);
             localStats.hygiene = Math.max(localStats.hygiene - 0.5, 0);
@@ -249,11 +271,16 @@
             localStats.fun = Math.max(localStats.fun - 1, 0);
         }
         
-        localStats.lastSaveTime = Date.now();
-        set(ref(db, 'users/' + currentUser), localStats);
+        // Loop içindeki kaydetmeyi kapattım ki sürekli veritabanını yormasın
+        // Sadece ekranda güncellensin, kullanıcı butonlara basınca veya
+        // site kapanıp açılınca kaydetsin daha sağlıklı.
+        // Ama "Benim internetim bol" diyorsan alttaki satırı açabilirsin:
+        // set(ref(db, 'users/' + currentUser), localStats);
+        
+        updateUI(localStats);
     }
 
 </script>
-
 </body>
+
 </html>
