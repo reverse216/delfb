@@ -87,14 +87,15 @@
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     // --- BURAYI KENDİ BİLGİLERİNLE DOLDUR ---
-    const firebaseConfig = {
-        apiKey: "AIzaSyAafnX1FRRmpgZeGcsU_Y0OnvcJnNYT9tc",
-        authDomain: "dlfnb-fb286.firebaseapp.com",
-        projectId: "dlfnb-fb286",
-        storageBucket: "dlfnb-fb286.firebasestorage.app",
-        messagingSenderId: "941682911917",
-        appId: "1:941682911917:web:18f53833a4cd0076a2f424"
-    };
+     const firebaseConfig = {
+    apiKey: "AIzaSyAafnX1FRRmpgZeGcsU_Y0OnvcJnNYT9tc",
+    authDomain: "dlfnb-fb286.firebaseapp.com",
+    databaseURL: "https://dlfnb-fb286-default-rtdb.firebaseio.com",
+    projectId: "dlfnb-fb286",
+    storageBucket: "dlfnb-fb286.firebasestorage.app",
+    messagingSenderId: "941682911917",
+    appId: "1:941682911917:web:18f53833a4cd0076a2f424"
+  };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
@@ -288,4 +289,5 @@
 </body>
 
 </html>
+
 
