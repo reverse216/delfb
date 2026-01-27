@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Delfin Bebek</title>
+    <style>
+        :root { --primary: #ff9a9e; --bg-color: #fecfef; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: #e0f7fa; height: 100vh; display: flex; justify-content: center; align-items: center; user-select: none; }
+        #game-container { width: 100%; height: 100%; max-width: 450px; background: #fff; position: relative; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        
+        /* Giriş Ekranı */
+        #login-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .login-box input { padding: 15px; border-radius: 20px; border: 1px solid #ddd; margin-bottom: 10px; text-align: center; background: #f9f9f9; }
+        .btn-main { padding: 12px 40px; background: var(--primary); color: white; border: none; border-radius: 25px; font-size: 18px; cursor: pointer; box-shadow: 0 4px 10px rgba(255, 154, 158, 0.4); }
+        
+        /* Oyun Arayüzü */
+        #game-ui { display: none; height: 100%; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; }
+        .stats-container { background: rgba(255,255,255,0.9); padding: 15px; border-radius: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-box { font-size: 14px; color: #555; display: flex; align-items: center; }
+        .bar-wrapper { flex-grow: 1; height: 8px; background: #eee; border-radius: 4px; margin-left: 8px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 100%; transition: width 0.5s ease; }
+        
+        /* Renkler */
+        #hunger-bar { background: #ffadad; } 
+        #hygiene-bar { background: #9bf6ff; }
+        #sleep-bar { background: #bdb2ff; } 
+        #fun-bar { background: #fdffb6; }
+
+        /* Karakter Alanı */
+        .character-area { flex-grow: 1; display: flex; justify-content: center; align-items: center; position: relative; }
+        
+        /* GIF Ayarı: Pixel Art olduğu için bulanıklaşmasın diye */
+        #char-img {
+            width: 200px; 
+            height: 200px; 
+            image-rendering: pixelated; /* Pikselleri net gösterir */
+            object-fit: contain;
+        }
+
+        /* Butonlar */
+        .actions-container { display: flex; justify-content: space-around; background: white; padding: 15px; border-radius: 20px; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
+        .action-btn { background: none; border: none; font-size: 32px; cursor: pointer; transition: transform 0.1s; padding: 10px; }
+        .action-btn:active { transform: scale(0.9); }
+        
+        /* Durum Mesajı */
+        #status-bar { text-align: center; font-size: 12px; color: #aaa; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="login-screen">
+        <h1 style="color: #ff9a9e;">Delfin Bebek</h1>
+        <div class="login-box">
+            <input type="text" id="username" value="delfin" readonly>
+            <br>
+            <button class="btn-main" onclick="startGame()">Bağlan</button>
+        </div>
+    </div>
+
+    <div id="game-ui">
+        <div id="status-bar">Sunucuya bağlanıyor...</div>
+        
+        <div class="stats-container">
+            <div class="stat-box">🍔 Açlık <div class="bar-wrapper"><div id="hunger-bar" class="bar-fill"></div></div></div>
+            <div class="stat-box">🧼 Temizlik <div class="bar-wrapper"><div id="hygiene-bar" class="bar-fill"></div></div></div>
+            <div class="stat-box">😴 Uyku <div class="bar-wrapper"><div id="sleep-bar" class="bar-fill"></div></div></div>
+            <div class="stat-box">🎮 Eğlence <div class="bar-wrapper"><div id="fun-bar" class="bar-fill"></div></div></div>
+        </div>
+
+        <div class="character-area">
+            <img id="char-img" src="./assets/idle.gif" alt="Karakter">
+        </div>
+
+        <div class="actions-container">
+            <button class="action-btn" onclick="performAction('feed', 20)">🍔</button>
+            <button class="action-btn" onclick="performAction('wash', 100)">🧼</button>
+            <button class="action-btn" onclick="toggleSleep()">😴</button>
+            <button class="action-btn" onclick="performAction('play', 15)">🎮</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // --- BURAYI KENDİ FIREBASE BİLGİLERİNLE DOLDUR ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAafnX1FRRmpgZeGcsU_Y0OnvcJnNYT9tc",
+        authDomain: "dlfnb-fb286.firebaseapp.com",
+        projectId: "dlfnb-fb286",
+        storageBucket: "dlfnb-fb286.firebasestorage.app",
+        messagingSenderId: "941682911917",
+        appId: "1:941682911917:web:18f53833a4cd0076a2f424"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const currentUser = "delfin";
+    
+    let localStats = {}; 
+    let isActionPlaying = false; // Şu an yemek yiyor mu?
+    let animationTimeout; // Animasyon zamanlayıcısı
+
+    // Oyunu Başlat
+    window.startGame = function() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'flex';
+        
+        // Veritabanını Dinle
+        const starCountRef = ref(db, 'users/' + currentUser);
+        onValue(starCountRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                localStats = data;
+                updateUI(localStats);
+                document.getElementById('status-bar').innerText = "🟢 Canlı Bağlantı";
+            } else {
+                // İlk kez açılıyorsa veriyi oluştur
+                resetData();
+            }
+        });
+
+        // Offline hesaplama ve döngü (Sadece tarayıcı açıkken tetikleyici olur)
+        setInterval(gameLoop, 2000);
+    }
+
+    function resetData() {
+        const initialData = {
+            hunger: 100, hygiene: 100, sleep: 100, fun: 100,
+            isSleeping: false,
+            lastSaveTime: Date.now()
+        };
+        set(ref(db, 'users/' + currentUser), initialData);
+    }
+
+    // Buton Aksiyonları (Yemek, Yıkama, Oyun)
+    window.performAction = function(type, amount) {
+        if (!localStats) return;
+        if (localStats.isSleeping) {
+            alert("Uyurken işlem yapamazsın! Önce uyandır.");
+            return;
+        }
+
+        // İstatistikleri Güncelle
+        if (type === 'feed') localStats.hunger = Math.min(localStats.hunger + amount, 100);
+        if (type === 'wash') localStats.hygiene = 100;
+        if (type === 'play') {
+            localStats.fun = Math.min(localStats.fun + amount, 100);
+            localStats.sleep = Math.max(localStats.sleep - 10, 0); // Oyun yorar
+        }
+        
+        localStats.lastSaveTime = Date.now();
+        set(ref(db, 'users/' + currentUser), localStats);
+
+        // Aksiyon Animasyonunu Oynat
+        playAnimation(type);
+    }
+
+    // Uyku Modunu Aç/Kapat
+    window.toggleSleep = function() {
+        if (!localStats) return;
+        
+        // Durumu tersine çevir
+        localStats.isSleeping = !localStats.isSleeping;
+        localStats.lastSaveTime = Date.now();
+        set(ref(db, 'users/' + currentUser), localStats);
+    }
+
+    // Animasyon Yöneticisi
+    function playAnimation(actionType) {
+        const img = document.getElementById('char-img');
+        isActionPlaying = true; // Geçici animasyon başladı
+        
+        // Hangi GIF oynayacak?
+        let gifName = 'idle';
+        if (actionType === 'feed') gifName = 'eating';
+        if (actionType === 'wash') gifName = 'washing';
+        if (actionType === 'play') gifName = 'eating'; // Oyun için özel gif yoksa eating veya zıplama kullanabilirsin
+
+        img.src = `./assets/${gifName}.gif`;
+
+        // Varsa eski zamanlayıcıyı iptal et
+        if (animationTimeout) clearTimeout(animationTimeout);
+
+        // 3 Saniye sonra normale dön
+        animationTimeout = setTimeout(() => {
+            isActionPlaying = false;
+            updateCharacterState(); // Duruma uygun GIF'e geri dön
+        }, 3000);
+    }
+
+    // Karakterin Sürekli Durumunu Kontrol Eden Fonksiyon
+    function updateCharacterState() {
+        if (isActionPlaying) return; // Eğer şu an yemek yiyorsa araya girme
+
+        const img = document.getElementById('char-img');
+        let nextGif = 'idle'; // Varsayılan
+
+        // Öncelik Sırası:
+        // 1. Uyuyor mu?
+        if (localStats.isSleeping) {
+            nextGif = 'sleeping';
+        }
+        // 2. Çok mu uykusuz? (Uyku < 20 ve uyumuyorsa)
+        else if (localStats.sleep < 20) {
+            nextGif = 'sleepy';
+        }
+        // 3. Çok mu aç? (Açlık < 30)
+        else if (localStats.hunger < 30) {
+            nextGif = 'hungry';
+        }
+        // 4. Çok mu kirli? (Temizlik < 40)
+        else if (localStats.hygiene < 40) {
+            nextGif = 'dirty';
+        }
+
+        // Eğer resim değişecekse değiştir (Sürekli yenileme yapmasın diye kontrol)
+        const currentSrc = img.src;
+        if (!currentSrc.includes(nextGif + '.gif')) {
+            img.src = `./assets/${nextGif}.gif`;
+        }
+    }
+
+    // Arayüzü ve Barları Güncelle
+    function updateUI(stats) {
+        document.getElementById('hunger-bar').style.width = stats.hunger + '%';
+        document.getElementById('hygiene-bar').style.width = stats.hygiene + '%';
+        document.getElementById('sleep-bar').style.width = stats.sleep + '%';
+        document.getElementById('fun-bar').style.width = stats.fun + '%';
+
+        updateCharacterState(); // GIF'i güncelle
+    }
+
+    // Oyun Döngüsü (Zamanla azalma)
+    function gameLoop() {
+        if (!localStats.hunger) return;
+
+        // Uyuyorsa farklı, uyanıksa farklı azalır
+        if (localStats.isSleeping) {
+            localStats.sleep = Math.min(localStats.sleep + 2, 100); // Uyurken enerji dolar
+            localStats.hunger = Math.max(localStats.hunger - 0.5, 0); // Uyurken az acıkır
+        } else {
+            localStats.hunger = Math.max(localStats.hunger - 1, 0);
+            localStats.hygiene = Math.max(localStats.hygiene - 0.5, 0);
+            localStats.sleep = Math.max(localStats.sleep - 0.5, 0);
+            localStats.fun = Math.max(localStats.fun - 1, 0);
+        }
+        
+        localStats.lastSaveTime = Date.now();
+        set(ref(db, 'users/' + currentUser), localStats);
+    }
+
+</script>
+
+</body>
+</html>
