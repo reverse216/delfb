@@ -131,42 +131,46 @@
 
     // --- EKSİK OLAN FONKSİYON BU ---
     // Site kapalıyken geçen süreyi hesaplayıp statları düşürür
+    // Site kapalıyken geçen süreyi hesaplayan DÜZELTİLMİŞ fonksiyon
     function calculateOfflineProgress(lastTime) {
         if (!lastTime) return;
 
         const now = Date.now();
         const diffSeconds = Math.floor((now - lastTime) / 1000); // Saniye farkı
         
-        // Eğer 2 dakikadan (120 saniye) fazla kapalı kaldıysa hesapla
-        if (diffSeconds > 120) {
+        // Test için 10 saniyeden fazla kapalı kalırsa hesaplasın (Canlıda bunu 60 yapabilirsin)
+        if (diffSeconds > 10) {
             console.log("Site kapalıyken geçen süre (sn):", diffSeconds);
 
-            // FORMÜL: Her 10 dakikada (600sn) 1 puan düşsün
-            // İstediğin zorluğa göre 600 sayısını değiştirebilirsin.
-            // Sayı küçülürse oyun zorlaşır (daha çabuk acıkır).
-            const dropAmount = Math.floor(diffSeconds / 600); 
+            // FORMÜL: Her 10 dakikada (600sn) 1 birim değişim olsun
+            // Hızlı test etmek istersen 600 yerine 10 yazabilirsin.
+            const changeAmount = Math.floor(diffSeconds / 600); 
 
-            if (dropAmount > 0) {
-                // Statları düşür (Ama 0'ın altına inmesin)
-                localStats.hunger = Math.max(localStats.hunger - dropAmount, 0);
-                localStats.hygiene = Math.max(localStats.hygiene - dropAmount, 0);
-                
-                // Uyurken enerji artar, uyanıksa azalır mantığı
-                if (localStats.isSleeping) {
-                    localStats.sleep = Math.min(localStats.sleep + dropAmount, 100);
+            if (changeAmount > 0) {
+                // 1. AÇLIK, TEMİZLİK ve EĞLENCE her türlü azalır (Uyusa da uyanık olsa da acıkır)
+                localStats.hunger = Math.max(localStats.hunger - changeAmount, 0);
+                localStats.hygiene = Math.max(localStats.hygiene - changeAmount, 0);
+                localStats.fun = Math.max(localStats.fun - changeAmount, 0);
+
+                // 2. KRİTİK NOKTA: UYKU MANTIĞI
+                if (localStats.isSleeping === true) {
+                    // Eğer uyuyorsa: Uyku puanı ARTAR (Enerji dolar)
+                    // Hatta uykudayken daha hızlı dolsun diye changeAmount'u 2 ile çarptım.
+                    localStats.sleep = Math.min(localStats.sleep + (changeAmount * 2), 100);
+                    
+                    console.log(`Bebek uyuyordu, enerji doldu: +${changeAmount * 2}`);
                 } else {
-                    localStats.sleep = Math.max(localStats.sleep - dropAmount, 0);
-                    localStats.fun = Math.max(localStats.fun - dropAmount, 0);
+                    // Eğer uyanıksa: Uyku puanı AZALIR (Yorulur)
+                    localStats.sleep = Math.max(localStats.sleep - changeAmount, 0);
+                    
+                    console.log(`Bebek uyanıktı, yoruldu: -${changeAmount}`);
                 }
-
-                // Tarihi güncelle ki tekrar tekrar düşürmesin
+                
+                // Şimdiki zamanı kaydet
                 localStats.lastSaveTime = now;
 
-                // Yeni halini Firebase'e kaydet
+                // Firebase'i güncelle
                 set(ref(db, 'users/' + currentUser), localStats);
-                
-                // Kullanıcıya bilgi ver (Konsolda görünür)
-                console.log(`Siz yokken ${dropAmount} puan düştü!`);
             }
         }
     }
@@ -284,3 +288,4 @@
 </body>
 
 </html>
+
