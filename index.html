@@ -45,6 +45,155 @@
         
         /* Durum Mesajı */
         #status-bar { text-align: center; font-size: 12px; color: #aaa; margin-bottom: 5px; }
+        #mini-game-screen {
+    display: none; /* Başlangıçta gizli */
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(to bottom, #2b0042, #4b0082); /* Gece gökyüzü */
+    z-index: 100;
+    overflow: hidden;
+    flex-direction: column;
+    align-items: center;
+}
+
+#game-info {
+    width: 100%;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    z-index: 101;
+}
+
+/* Düşen nesneler */
+.falling-item {
+    position: absolute;
+    font-size: 30px;
+    animation: fall linear forwards;
+}
+
+@keyframes fall {
+    to { transform: translateY(110vh); }
+}
+
+
+        /* --- SEVGİLİLER GÜNÜ ÖZEL STİLLERİ --- */
+
+/* 1. Sağ Üstteki Küçük Buton */
+#vday-btn {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    width: 50px;
+    height: 50px;
+    background: #ff4d6d;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 77, 109, 0.5);
+    z-index: 200;
+    animation: pulse 1.5s infinite;
+}
+
+/* Kalp Atışı Animasyonu */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(255, 77, 109, 0.8); }
+    100% { transform: scale(1); }
+}
+
+/* 2. Bildirim Balonu */
+#vday-notification {
+    display: none; /* Başlangıçta gizli */
+    position: fixed;
+    top: 75px; /* Butonun hemen altı */
+    right: 15px;
+    background: white;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    z-index: 199;
+    width: 200px;
+    font-size: 14px;
+    border-left: 5px solid #ff4d6d;
+    cursor: pointer;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* 3. Büyük Kart (Overlay) */
+#vday-card-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.8); /* Arka planı karart */
+    z-index: 300;
+    justify-content: center;
+    align-items: center;
+}
+
+.vday-card {
+    background: #fff0f3;
+    width: 85%;
+    max-width: 350px;
+    padding: 20px;
+    border-radius: 25px;
+    text-align: center;
+    position: relative;
+    border: 4px solid #ffccd5;
+    box-shadow: 0 0 50px rgba(255, 77, 109, 0.6);
+    animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popUp {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* Kapat Butonu */
+.close-card {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ff4d6d;
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+/* Görkem Bebek Resmi */
+.gorkem-img {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    border-radius: 50%;
+    border: 3px dashed #ff4d6d;
+    background: white;
+    margin-bottom: 10px;
+}
+
+.love-message {
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    color: #555;
+    font-size: 16px;
+    line-height: 1.5;
+}
+    
     </style>
 </head>
 <body>
@@ -77,11 +226,50 @@
             <button class="action-btn" onclick="performAction('feed', 20)">🍔</button>
             <button class="action-btn" onclick="performAction('wash', 100)">🧼</button>
             <button class="action-btn" onclick="toggleSleep()">😴</button>
-            <button class="action-btn" onclick="performAction('play', 15)">🎮</button>
+            <button class="action-btn" onclick="startMiniGame()">🎮</button>
         </div>
+        <div id="mini-game-screen">
+        <div id="game-info">
+            <span id="score-board">Puan: 0</span>
+            <span id="time-board">Süre: 30</span>
+        </div>
+        
+        <img id="player-char" src="./assets/idle.gif" style="position: absolute; bottom: 20px; left: 50%; width: 80px; height: 80px; transform: translateX(-50%); transition: left 0.1s; pointer-events: none;">
+        
+        <button onclick="endMiniGame(true)" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: none; border: 1px solid white; color: white; padding: 5px 10px; border-radius: 10px; cursor: pointer;">Çık</button>
+    </div>
     </div>
 </div>
 
+<div id="vday-btn" onclick="showNotification()">
+    💌
+    <div class="heart-beat"></div>
+</div>
+
+<div id="vday-notification" onclick="openVDayCard()">
+    🔔 <strong>Görkem Bebek'ten</strong> sana özel bir mesaj var! <br>
+    <span style="font-size:12px; color: #ff4d4d;">(Okumak için tıkla)</span>
+</div>
+
+<div id="vday-card-overlay">
+    <div class="vday-card">
+        <button class="close-card" onclick="closeVDayCard()">✖</button>
+        
+        <img src="./assets/gorkem_love.png" alt="Görkem Bebek" class="gorkem-img">
+        
+        <h2 style="color: #d63384; margin: 10px 0;">Sevgililer Günün Kutlu Olsun! ❤️</h2>
+        
+        <p class="love-message">
+            Seninle her günüm oyun gibi eğlenceli, <br>
+            sensizken özleminle dolu... <br>
+            nerde olursan ol sana olan aşkım hep sonsuz! <br>
+            <br>
+            İyi ki varsın sevgilim...
+            Sevgililer günümüz kutlu olsun! ❤️
+        </p>
+    </div>
+</div>
+    
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
@@ -157,14 +345,14 @@
                 if (localStats.isSleeping === true) {
                     // Eğer uyuyorsa: Uyku puanı ARTAR (Enerji dolar)
                     // Hatta uykudayken daha hızlı dolsun diye changeAmount'u 2 ile çarptım.
-                    localStats.sleep = Math.min(localStats.sleep + (changeAmount * 2), 100);
+                    localStats.sleep = Math.min(localStats.sleep + (changeAmount * 10), 100);
                     
-                    console.log(`Bebek uyuyordu, enerji doldu: +${changeAmount * 2}`);
+                    console.log(`Bebek uyuyordu, enerji doldu: +${changeAmount * 10}`);
                 } else {
                     // Eğer uyanıksa: Uyku puanı AZALIR (Yorulur)
-                    localStats.sleep = Math.max(localStats.sleep - changeAmount, 0);
+                    localStats.sleep = Math.max(localStats.sleep - (changeAmount / 3), 0);
                     
-                    console.log(`Bebek uyanıktı, yoruldu: -${changeAmount}`);
+                    console.log(`Bebek uyanıktı, yoruldu: -${changeAmount / 3}`);
                 }
                 
                 // Şimdiki zamanı kaydet
@@ -202,6 +390,148 @@
         localStats.lastSaveTime = Date.now();
         set(ref(db, 'users/' + currentUser), localStats);
         playAnimation(type);
+    }
+    // --- MİNİ OYUN DEĞİŞKENLERİ ---
+    let gameActive = false;
+    let score = 0;
+    let timeLeft = 30;
+    let spawnInterval;
+    let timerInterval;
+
+    // Oyunu Başlat
+    window.startMiniGame = function() {
+        if (localStats.isSleeping) {
+            alert("Bebek uyurken oyun oynayamazsın! Önce uyandır.");
+            return;
+        }
+
+        // Ekranları değiştir
+        document.getElementById('game-ui').children[1].style.display = 'none'; // Stats gizle
+        document.getElementById('game-ui').children[2].style.display = 'none'; // Karakter gizle
+        document.getElementById('game-ui').children[3].style.display = 'none'; // Butonlar gizle
+        document.getElementById('mini-game-screen').style.display = 'flex';
+
+        // Değerleri sıfırla
+        score = 0;
+        timeLeft = 30;
+        gameActive = true;
+        document.getElementById('score-board').innerText = "Puan: 0";
+        document.getElementById('time-board').innerText = "Süre: 30";
+
+        // Zamanlayıcıyı başlat
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('time-board').innerText = "Süre: " + timeLeft;
+            if (timeLeft <= 0) {
+                endMiniGame(false); // Süre bitti
+            }
+        }, 1000);
+
+        // Nesne düşürmeyi başlat
+        spawnInterval = setInterval(spawnFallingItem, 700); // 0.7 saniyede bir düşer
+    };
+
+    // Dokunmatik ve Mouse Kontrolü (Bunu script'in en altına, window.startMiniGame dışına koy)
+    const gameScreen = document.getElementById('mini-game-screen');
+    const player = document.getElementById('player-char');
+
+    gameScreen.addEventListener('touchmove', (e) => {
+        if (!gameActive) return;
+        let touchX = e.touches[0].clientX;
+        // Sınırları koru
+        if (touchX > 40 && touchX < window.innerWidth - 40) {
+            player.style.left = touchX + 'px';
+        }
+    });
+
+    gameScreen.addEventListener('mousemove', (e) => {
+        if (!gameActive) return;
+        let mouseX = e.clientX;
+        if (mouseX > 40 && mouseX < window.innerWidth - 40) {
+            player.style.left = mouseX + 'px';
+        }
+    });
+
+    // Yukarıdan Nesne Düşür
+    function spawnFallingItem() {
+        if (!gameActive) return;
+
+        const item = document.createElement('div');
+        const items = ["⭐", "❤️", "🍪", "💎"]; // Düşecek şeyler
+        item.innerText = items[Math.floor(Math.random() * items.length)];
+        item.classList.add('falling-item');
+        
+        // Rastgele yatay konum
+        const randomLeft = Math.floor(Math.random() * (window.innerWidth - 60)) + 30;
+        item.style.left = randomLeft + 'px';
+        item.style.top = '-50px';
+        
+        // Düşme hızı (Süre azaldıkça hızlanabilir)
+        const duration = Math.random() * 2 + 2; // 2 ile 4 saniye arası
+        item.style.animationDuration = duration + 's';
+
+        gameScreen.appendChild(item);
+
+        // Çarpışma Kontrolü (Her nesne kendi kendini kontrol eder)
+        const collisionCheck = setInterval(() => {
+            if (!gameActive) { clearInterval(collisionCheck); item.remove(); return; }
+
+            const pRect = player.getBoundingClientRect();
+            const iRect = item.getBoundingClientRect();
+
+            // Basit çarpışma mantığı
+            if (
+                iRect.top + iRect.height > pRect.top + 10 && // Bebeğin kafasına değdi mi?
+                iRect.top < pRect.bottom &&
+                iRect.left < pRect.right &&
+                iRect.right > pRect.left
+            ) {
+                // YAKALADI!
+                score += 10;
+                document.getElementById('score-board').innerText = "Puan: " + score;
+                item.remove();
+                clearInterval(collisionCheck);
+            }
+
+            // Ekrandan çıktıysa sil
+            if (iRect.top > window.innerHeight) {
+                item.remove();
+                clearInterval(collisionCheck);
+            }
+        }, 50);
+    }
+
+    // Oyunu Bitir
+    window.endMiniGame = function(forceExit) {
+        gameActive = false;
+        clearInterval(spawnInterval);
+        clearInterval(timerInterval);
+
+        // Ekrandaki tüm düşenleri temizle
+        document.querySelectorAll('.falling-item').forEach(e => e.remove());
+
+        // Ana ekrana dön
+        document.getElementById('mini-game-screen').style.display = 'none';
+        
+        // Eski elementleri geri getir
+        const ui = document.getElementById('game-ui');
+        ui.children[1].style.display = 'grid'; // Stats
+        ui.children[2].style.display = 'flex'; // Karakter
+        ui.children[3].style.display = 'flex'; // Butonlar
+
+        if (!forceExit) {
+            alert(`Oyun Bitti! Toplam Puan: ${score}`);
+            
+            // Puanına göre eğlenceyi fulle
+            // 100 puan üstü yaptıysa %100 doldurur
+            localStats.fun = 100;
+            // Oyun oynamak yorar, uykuyu azalt
+            localStats.sleep = Math.max(localStats.sleep - 5, 0);
+            
+            localStats.lastSaveTime = Date.now();
+            set(ref(db, 'users/' + currentUser), localStats);
+            updateUI(localStats);
+        }
     }
 
     window.toggleSleep = function() {
@@ -267,12 +597,12 @@
         if (!localStats.hunger) return;
 
         if (localStats.isSleeping) {
-            localStats.sleep = Math.min(localStats.sleep + 2, 100); 
+            localStats.sleep = Math.min(localStats.sleep + 7, 100); 
             localStats.hunger = Math.max(localStats.hunger - 0.5, 0); 
         } else {
             localStats.hunger = Math.max(localStats.hunger - 1, 0);
             localStats.hygiene = Math.max(localStats.hygiene - 0.5, 0);
-            localStats.sleep = Math.max(localStats.sleep - 0.5, 0);
+            localStats.sleep = Math.max(localStats.sleep - 0.1, 0);
             localStats.fun = Math.max(localStats.fun - 1, 0);
         }
         
@@ -284,10 +614,41 @@
         
         updateUI(localStats);
     }
+    // --- SEVGİLİLER GÜNÜ FONKSİYONLARI ---
+
+    // 1. Mektup ikonuna basınca bildirimi göster
+    window.showNotification = function() {
+        const notif = document.getElementById('vday-notification');
+        
+        if (notif.style.display === 'block') {
+            notif.style.display = 'none'; // Açıksa kapat
+        } else {
+            notif.style.display = 'block'; // Kapalıysa aç
+            
+            // 5 saniye sonra otomatik kapansın (rahatsız etmesin)
+            setTimeout(() => {
+                notif.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    // 2. Bildirime tıklayınca Büyük Kartı Aç
+    window.openVDayCard = function() {
+        document.getElementById('vday-notification').style.display = 'none'; // Bildirimi gizle
+        document.getElementById('vday-card-overlay').style.display = 'flex'; // Kartı aç
+        
+        // Romantik bir efekt: Konfetiler (Basitçe emoji yağdırabiliriz ama şimdilik sade kalsın)
+    }
+
+    // 3. Kartı Kapat
+    window.closeVDayCard = function() {
+        document.getElementById('vday-card-overlay').style.display = 'none';
+    }
 
 </script>
 </body>
 
 </html>
+
 
 
